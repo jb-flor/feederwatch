@@ -1,0 +1,81 @@
+-- indexing summary table
+CREATE INDEX idx_summary_table ON species_yearly_summary (obs_year);
+CREATE INDEX idx_summary_species ON species_yearly_summary (species_code);
+
+-- verification of rows and dates
+SELECT 
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT species_code) AS unique_species,
+    COUNT(DISTINCT obs_year) AS years_covered,
+    MIN(obs_year) AS earliest_year,
+    MAX(obs_year) AS latest_year
+FROM species_yearly_summary;
+
+-- yearly aggregation
+SELECT
+    s.obs_year,
+    s.species_code,
+    sp.american_english_name,
+    s.avg_per_checklist,
+    s.checklist_count
+FROM species_yearly_summary s 
+JOIN species sp ON s.species_code = sp.species_code
+ORDER BY s.species_code, s.obs_year;
+
+-- LAG() for comparisons
+SELECT 
+    obs_year,
+    species_code,
+    american_english_name,
+    avg_per_checklist,
+    checklist_count,
+    LAG(avg_per_checklist) OVER (
+        PARTITION BY species_code
+        ORDER BY obs_year
+    ) AS prev_year_avg
+    FROM (
+        SELECT
+            s.obs_year, s.species_code,
+            sp.american_english_name,
+            s.avg_per_checklist, s.checklist_count
+        FROM species_yearly_summary s JOIN species sp
+        ON s.species_code = sp.species_code
+    ) AS base
+ORDER BY species_code, obs_year;
+
+-- percent change
+SELECT 
+    obs_year,
+    species_code,
+    american_english_name,
+    avg_per_checklist,
+    checklist_count,
+    prev_year_avg,
+    ROUND(avg_per_checklist - prev_year_avg, 2) 
+    AS yoy_change,
+    ROUND(((avg_per_checklist - prev_year_avg)/ prev_year_avg) * 100, 1)
+    AS pct_change
+FROM (
+    SELECT
+    obs_year,
+    species_code,
+    american_english_name,
+    avg_per_checklist,
+    checklist_count,
+    LAG(avg_per_checklist) OVER (
+        PARTITION BY species_code
+        ORDER BY obs_year
+    ) AS prev_year_avg
+FROM (
+    SELECT
+        s.obs_year,
+        s.species_code,
+        sp.american_english_name,
+        s.avg_per_checklist,
+        s.checklist_count
+    FROM species_yearly_summary s  
+    JOIN species sp ON s.species_code = sp.species_code
+    ) AS base
+) AS with_lag
+WHERE prev_year_avg IS NOT NULL AND checklist_count >= 30
+ORDER BY obs_year, pct_change DESC;
