@@ -43,7 +43,7 @@ SELECT
     ) AS base
 ORDER BY species_code, obs_year;
 
--- percent change
+-- percent change for species over years
 SELECT 
     obs_year,
     species_code,
@@ -127,7 +127,7 @@ SELECT * FROM
     WHERE month_rank = 1
     ORDER BY american_english_name;
 
-    -- unique species observed
+-- unique species observed
     SELECT 
         o.loc_id,
         o.subnational1_code,
