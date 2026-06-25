@@ -2,6 +2,7 @@
 CREATE DATABASE IF NOT EXISTS birdmigration;
 USE birdmigration;
 
+-- table creation for species, sites, and observations
 CREATE TABLE IF NOT EXISTS species (
     species_code VARCHAR(10) PRIMARY KEY, 
     alt_full_spp VARCHAR(10),
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS observations (
     FOREIGN KEY (species_code) REFERENCES species(species_code)
 );
 
+-- data import
 LOAD DATA INFILE 'C:/Users/jacob/OneDrive/Desktop/Datasets/FeederWatch Cornell Datasets/PFW_spp_translation_table_May2024.csv'
 INTO TABLE species
 FIELDS TERMINATED BY ',' ENCLOSED BY '"'
@@ -592,7 +594,7 @@ SELECT
     FROM observations;
 
 -- ex. for given species
--- run first then wait
+-- run each individually 
 CREATE INDEX idx_obs_date    ON observations (obs_date);
 CREATE INDEX idx_loc         ON observations (loc_id);
 CREATE INDEX idx_sub_id      ON observations (sub_id);        -- added, needed for JOIN
@@ -632,14 +634,13 @@ SELECT
     MAX(YEAR(obs_date))          AS latest_year
 FROM observations;
 
--- record by eyar
+-- record by year
 SELECT YEAR(obs_date) AS yr, COUNT(*) AS records
 FROM observations
 GROUP BY yr
 ORDER BY yr;
 
-- most observed species
-
+-- most observed species
 SELECT
     sp.american_english_name,
     COUNT(*)        AS total_obs,
@@ -658,7 +659,8 @@ SELECT
     species_code,
     COUNT(*)                 AS total_obs,
     SUM(how_many)            AS total_birds,
-    COUNT(DISTINCT sub_id)   AS checklist_count
+    COUNT(DISTINCT sub_id)   AS checklist_count,
+    ROUND(AVG(how_many),2) AS avg_per_checklist 
 FROM observations
 GROUP BY YEAR(obs_date), species_code;
 
