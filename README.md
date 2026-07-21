@@ -88,4 +88,17 @@ End-to-end Python analysis pipeline built on top of the cleaned MySQL data:
 5. Open `BirdJupyter.ipynb` in Jupyter, update the SQLAlchemy connection 
    string with your credentials, and run all cells
 
+## Results Examples
+
+## Results
+
+### Population Trends
+![Top 10 Species]()
+![House Sparrow]()
+
+### Seasonal Activity
+![Seasonal Heatmap]()
+
+### Regression Analysis
+![Regression Line]()
 
