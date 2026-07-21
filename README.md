@@ -97,7 +97,7 @@ End-to-end Python analysis pipeline built on top of the cleaned MySQL data:
 ![House Sparrow Population Trendline](https://github.com/jb-flor/feederwatch/blob/main/results/trend%20charts/housesparrow%20pop%20trend%20line.png?raw=true)
 
 ### Seasonal Activity
-![Top 10 Feeder Species Seasonal Heatmap](https://github.com/jbflor/feederwatch/blob/main/results/trend%20charts/seasonal%20heatmap%20for%20top%2010%20feeder%20species.png)
+![Top 10 Feeder Species Seasonal Heatmap](https://github.com/jb-flor/feederwatch/blob/main/results/trend%20charts/seasonal%20heatmap%20for%20top%2010%20feeder%20species.png)
 
 ### Regression Analysis
 ![House Sparrow Regression Line](https://github.com/jb-flor/feederwatch/blob/main/results/trend%20charts/lin.%20regression%20house%20sparrow.png)
