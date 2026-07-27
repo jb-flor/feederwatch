@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS species (
     taxonomic_sort_order INT
     );
 
+-- creates sites table
 CREATE TABLE IF NOT EXISTS sites (
     loc_id                        VARCHAR(20),
     latitude                      DECIMAL(9,6),
@@ -83,6 +84,8 @@ CREATE TABLE IF NOT EXISTS sites (
     PRIMARY KEY (loc_id, proj_period_id)
 );
 
+-- creates observation table
+-- contains all bird count records
 CREATE TABLE IF NOT EXISTS observations (
     obs_id              VARCHAR(20) PRIMARY KEY,
     loc_id              VARCHAR(20),
@@ -372,6 +375,7 @@ SELECT 'sites', COUNT(*) FROM sites
 UNION ALL
 SELECT 'observations', COUNT(*) FROM observations;
 
+-- confirm correct date range
 SELECT MIN(obs_date) AS earliest, MAX(obs_date) AS latest FROM observations;
 
 SELECT 
@@ -380,7 +384,7 @@ COUNT(DISTINCT species_code) AS distinct_species,
 COUNT(DISTINCT sub_id) AS distinct_checklists
 FROM observations;
 
---fixing "XX"
+-- Identify records flagged with 'XX'
 SELECT COUNT(*) AS xx_obs_count
 FROM observations
 WHERE subnational1_code = 'XX';
@@ -399,7 +403,7 @@ WHERE subnational1_code = 'XX'
 SELECT location_valid, COUNT(*) AS count
 FROM observations GROUP BY location_valid;
 
--- interpretation
+-- inspect the distributions of valid or reviewed flag combinations
 SELECT valid, reviewed,
     COUNT(*) AS obs_count,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct
@@ -407,7 +411,7 @@ FROM observations
 GROUP BY valid, reviewed
 ORDER BY valid DESC, reviewed;
 
--- label
+-- add label
 ALTER TABLE observations ADD COLUMN quality_status VARCHAR(30);
 
 UPDATE observations
@@ -419,7 +423,7 @@ SET quality_status = CASE
     ELSE 'Unknown'
 END;
 
--- distribution of quality
+-- distribution of quality labels
 SELECT quality_status, COUNT(*) AS obs_count
 FROM observations
 GROUP BY quality_status
@@ -430,7 +434,8 @@ SELECT * FROM observations
 WHERE quality_status IN ('Accepted', 'Expert Approved')
 AND location_valid = 1;
 
------- plus_code flag obs count
+-- plus_code flag obs count
+-- plus_code = 1 means the reported count is a min. estimate
 SELECT plus_code,
 COUNT(*) AS obs_count,
 AVG(how_many) AS avg_how_many,
@@ -446,7 +451,7 @@ UPDATE observations
 SET count_is_minimum = 1
 WHERE plus_code = 1;
 
--- species triggering plus_code
+-- identify which species commonly triggers plus_code flag
 SELECT sp.american_english_name,
 COUNT(*) AS plus_code_obs,
 ROUND(AVG(o.how_many), 1) AS avg_reported_count
@@ -457,11 +462,12 @@ GROUP BY sp.american_english_name
 ORDER BY plus_code_obs DESC
 LIMIT 20;
 
----- taxonomy observations
+---- taxonomy observations, indicates alternative species code, subspecies or revised taxonomy over the years
 SELECT COUNT(*) AS subspecies_obs
 FROM observations
 WHERE alt_full_spp_code IS NOT NULL;
 
+-- species/subspecies combinations that appear most frequently
 SELECT 
 species_code, alt_full_spp_code,
 COUNT(*) AS obs_count FROM
@@ -470,7 +476,7 @@ GROUP BY species_code, alt_full_spp_code
 ORDER BY obs_count DESC
 LIMIT 20;
 
--- add spec column
+-- add resolved species column
 ALTER TABLE observations ADD COLUMN
 resolved_species_code VARCHAR(10);
 
@@ -481,13 +487,14 @@ SET resolved_species_code = CASE
     ELSE  species_code
 END;
 
--- confirm resolved codes exist in species ref table
+-- confirm resolved codes exist in species reference table
 SELECT COUNT(*) AS unresolved
 FROM observations o 
 LEFT JOIN species sp ON o.resolved_species_code = sp.species_code
 WHERE sp.species_code IS NULL;
 
---- count column
+--Inspect the range and quality of the how_many count field
+-- Checks for NULLs, zeros, and negative vals
 SELECT
     MIN(how_many) AS min_count,
     MAX(how_many) AS max_count,
@@ -497,6 +504,7 @@ SELECT
     SUM(how_many < 0) AS negative_count
 FROM observations;
 
+-- investigate high counts
 SELECT
 o.obs_id,
 sp.american_english_name,
@@ -510,7 +518,7 @@ WHERE o.how_many > 10000
 ORDER BY o.how_many DESC
 LIMIT 20;
 
--- invalid flags
+-- invalid flags for negative counts
 UPDATE observations
 SET quality_status = 'Invalid - Negative Count'
 WHERE how_many < 0;
@@ -532,7 +540,8 @@ SET effort_halfdays = COALESCE(day1_am, 0)
                     + COALESCE(day2_am, 0)
                     + COALESCE(day2_pm, 0);
 
--- zero effort observations
+-- identify zero effort observations
+-- observations where no time was logged, ie. incomplete
 SELECT COUNT(*) AS zero_effort_obs
 FROM observations
 WHERE effort_halfdays = 0
@@ -559,6 +568,9 @@ HAVING COUNT(*) > 1
 ORDER BY dupes DESC
 LIMIT 20;
 
+-- deduplication via swap-table strategy
+-- keeps lowest obs_id per (sub_ide, species_code) combination, then swap in place of original
+-- check for duplicate species within the same checklist
 CREATE TABLE observations_deduped AS
 SELECT o.*
 FROM observations o
@@ -568,9 +580,11 @@ INNER JOIN (
     GROUP BY sub_id, species_code
 ) AS keep_ids ON o.obs_id = keep_ids.obs_id;
 
+-- verify row counts before committing to the swap
 SELECT COUNT(*) AS original_count FROM observations;
 SELECT COUNT(*) AS deduped_count  FROM observations_deduped;
 
+-- swap
 DROP TABLE observations;
 RENAME TABLE observations_deduped TO observations;
 
@@ -584,7 +598,7 @@ FROM observations
 GROUP BY sub_id, species_code
 HAVING COUNT(*) > 1;
 
--- zero-filling
+-- final row count after deduplication
 SELECT 
     COUNT(DISTINCT sub_id) AS
     total_checklists,
@@ -593,14 +607,13 @@ SELECT
     COUNT(*) AS actual_obs_rows
     FROM observations;
 
--- ex. for given species
--- run each individually 
+-- create indexes on high-frequencg join and filter columns
 CREATE INDEX idx_obs_date    ON observations (obs_date);
 CREATE INDEX idx_loc         ON observations (loc_id);
 CREATE INDEX idx_sub_id      ON observations (sub_id);        -- added, needed for JOIN
 CREATE INDEX idx_subnational ON observations (subnational1_code);
 
--- zero_filled ex
+-- zero_filled example table
 CREATE TABLE zero_filled_example AS
 SELECT
     c.sub_id,
@@ -625,7 +638,7 @@ LEFT JOIN observations o
     ON c.sub_id = o.sub_id
     AND o.species_code = sp.species_code;
 
--- summary
+-- full dataset summary
 SELECT
     COUNT(*)                     AS total_rows,
     COUNT(DISTINCT sub_id)       AS total_checklists,
@@ -634,13 +647,14 @@ SELECT
     MAX(YEAR(obs_date))          AS latest_year
 FROM observations;
 
--- record by year
+-- record count by year
 SELECT YEAR(obs_date) AS yr, COUNT(*) AS records
 FROM observations
 GROUP BY yr
 ORDER BY yr;
 
--- most observed species
+-- top 10 most observed species from 2010-2020 sample
+-- scoped to dat range above to avoid full-table scan performance issues
 SELECT
     sp.american_english_name,
     COUNT(*)        AS total_obs,
@@ -652,7 +666,7 @@ GROUP BY sp.american_english_name
 ORDER BY total_birds DESC
 LIMIT 10;
 
--- aggregate summary table 
+-- creates a yearly summary table pre-aggregating key metrics per species
 CREATE TABLE species_yearly_summary AS
 SELECT
     YEAR(obs_date)           AS obs_year,
@@ -664,7 +678,7 @@ SELECT
 FROM observations
 GROUP BY YEAR(obs_date), species_code;
 
--- summary 10
+-- summary top 10
 SELECT
     sp.american_english_name,
     SUM(s.total_obs)   AS total_obs,
