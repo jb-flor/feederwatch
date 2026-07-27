@@ -1,4 +1,4 @@
--- indexing summary table
+-- Index the summary table on the most-queried columns
 CREATE INDEX idx_summary_table ON species_yearly_summary (obs_year);
 CREATE INDEX idx_summary_species ON species_yearly_summary (species_code);
 
@@ -11,7 +11,8 @@ SELECT
     MAX(obs_year) AS latest_year
 FROM species_yearly_summary;
 
--- yearly aggregation
+-- Joins summary table to species names
+-- Returns average count per checklist and checklist per species per year
 SELECT
     s.obs_year,
     s.species_code,
@@ -22,7 +23,8 @@ FROM species_yearly_summary s
 JOIN species sp ON s.species_code = sp.species_code
 ORDER BY s.species_code, s.obs_year;
 
--- LAG() for comparisons
+-- LAG() window function for comparisons
+-- pulls prior year's average along with the curret year for every species
 SELECT 
     obs_year,
     species_code,
@@ -43,7 +45,7 @@ SELECT
     ) AS base
 ORDER BY species_code, obs_year;
 
--- percent change for species over years
+-- absolute and percent change for species over years, filters out first year of appearance
 SELECT 
     obs_year,
     species_code,
@@ -80,7 +82,7 @@ FROM (
 WHERE prev_year_avg IS NOT NULL AND checklist_count >= 30
 ORDER BY obs_year, pct_change DESC;
 
--- migratory trends, months where a species arrives, departs, and peaks
+-- migratory trends, identifies when (month) a species arrives, departs, and peaks
 SELECT 
     obs_month,
     species_code,
@@ -127,7 +129,8 @@ SELECT * FROM
     WHERE month_rank = 1
     ORDER BY american_english_name;
 
--- unique species observed
+--Ranks feeder sites within each state by species richness variable
+-- ie. number of unique species observed
     SELECT 
         o.loc_id,
         o.subnational1_code,
