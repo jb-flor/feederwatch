@@ -1,4 +1,5 @@
 --monthly aggregation, finding monthly averages within observations table
+--calculates average bird count per species per month, across all available years
 SELECT 
     MONTH(o.obs_date) AS obs_month,
     o.species_code,
@@ -10,7 +11,9 @@ JOIN species sp ON o.species_code = sp.species_code
 GROUP BY MONTH(o.obs_date), o.species_code, sp.american_english_name
 ORDER BY o.species_code, obs_month;
 
--- RANK() for scoring the months each species occurs in
+-- RANK() window function for scoring the months each species occurs in by average count - rank 1 - peak month
+-- Rank 12 is the lowest month
+-- PARTITION BY species_code ensures ranks reset for each species
 SELECT 
     obs_month,
     species_code,
@@ -34,7 +37,9 @@ SELECT
         ) AS monthly_avg
         ORDER BY species_code, obs_month;
 
--- filter for getting peak month per species
+-- filter to month_rank - 1 to return one row per species
+-- showws only peak activity month
+-- checklist_count >= 30 filters out species with few observations recorded
 SELECT * FROM (
     SELECT 
         obs_month,
@@ -61,7 +66,7 @@ SELECT * FROM (
 month_rank = 1 AND checklist_count >= 30
 ORDER BY american_english_name;
 
--- top 3 months per species: arrival, peak, and departure
+-- Extends filter to month_rank <= 3 to capture the full activity window of a species
 SELECT * FROM (
     SELECT 
         obs_month,
@@ -88,7 +93,8 @@ SELECT * FROM (
 WHERE month_rank <= 3 AND checklist_count >= 30
 ORDER BY american_english_name, month_rank;
 
--- species richness per site, bird biodiversity patterns
+-- Count unique species recorded at each feeder site
+-- filters out sites with too few visits
 SELECT
     o.loc_id,
     o.subnational1_code,
@@ -99,6 +105,8 @@ GROUP BY o.loc_id, o.subnational1_code
 HAVING COUNT(DISTINCT o.sub_id) >= 10 
 ORDER BY species_richness DESC;
 
+-- Adds RANK() windown function to rank each site by species richness (unique species observed)
+-- within a given state or province
 SELECT
     loc_id,
     subnational1_code,
